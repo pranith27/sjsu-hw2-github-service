@@ -6,7 +6,6 @@ from app.routes.issues import router as issues_router
 from app.config import settings
 from app.routes.webhook import router as webhook_router
 
-print(settings.GITHUB_TOKEN[:20])
 
 app = FastAPI(
     title="GitHub Issues Service API",
