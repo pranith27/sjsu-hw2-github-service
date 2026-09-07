@@ -1,139 +1,27 @@
-# Design Note
+# GitHub Issues Service design note
 
-## GitHub Issues Service API
+The service exposes issue and comment operations for one repository configured through environment variables. FastAPI handles routing and Pydantic validates inputs. A shared HTTPX client wrapper sends authenticated requests to GitHub. Original implementation: Pranith Varma. Remediation and review: Bernie Miao using AI coding assistance.
 
-Names: Pranith Varma, Bernie, Swaroop, Weihao Fu
+## HTTP contract and upstream failures
 
----
+Response models describe Issue, Comment and Error payloads in the exported OpenAPI 3.1 contract. Missing/invalid inputs return 400, including upstream GitHub validation failures. Authentication, permission and not-found errors retain their useful status and message. Issue creation returns 201 with Location; accepted webhooks return 204. Pagination parameters are validated before forwarding, and GitHub's Link header is returned unchanged.
 
-## Overview
+Rate-limited 403 responses are distinguished from ordinary permission failures. Rate-limit responses become 429 with Retry-After derived from provider headers or a conservative fallback. GET requests may retry up to three times with short bounded delays. A long provider wait is surfaced to the caller instead of sleeping inside a worker. Writes and transport failures are not retried automatically because an ambiguous timeout can occur after GitHub created an issue/comment. Such failures return 503 and require inspecting upstream state before another write.
 
-This project implements a production-style REST API using FastAPI that acts as a wrapper around the GitHub Issues REST API. Instead of interacting directly with GitHub, clients communicate with this service, which validates requests, forwards them to GitHub, and returns simplified responses.
+## Webhook integrity and idempotency
 
-The application also receives GitHub webhooks, validates HMAC signatures, stores webhook events locally, and exposes OpenAPI documentation.
+The receiver limits the body to 25 MiB and verifies its raw bytes using HMAC SHA-256 and constant-time comparison. Only then does it parse JSON and validate event type, action, delivery ID and the required issue number. Ping has a separate minimal payload path. Unsupported or malformed requests return 400; signature failures return 401. An atomic in-memory update records each delivery-ID/action pair once, so concurrent retries do not append duplicates.
 
----
+In-memory storage is explicitly allowed by the assignment. It keeps this single-process demonstration small but loses state on restart and does not synchronize multiple workers. A durable store with a unique delivery/action constraint would be needed if those deployment requirements changed. Read operations return snapshots rather than mutable references to the stored event data.
 
-## Architecture
+## Credentials and exposure
 
-The application is organized into modular components.
+GITHUB_TOKEN is a server-managed bearer credential for outbound GitHub calls, scoped to Issues read/write in the test repository. The OpenAPI security scheme and upstream-security extension describe that role without pretending that the service implements caller authentication. Issue-management routes stay on localhost. The documented tunnel policy exposes only POST /webhook; the signature is its authentication boundary.
 
-- app/main.py
-  - Application entry point
+Credentials remain outside source and image layers. Docker copies only the application/schema, runs as a non-root user, and receives configuration at runtime. Exposed credentials must be rotated by their owner; editing a report cannot revoke them. JSON logs contain request IDs and safe webhook summary fields, not raw payloads, signatures or secrets. Validation errors omit reflected input and unexpected failures return a generic error.
 
-- app/routes/
-  - REST API endpoints
+## Verification
 
-- app/github_client.py
-  - GitHub REST API integration
+Offline tests run without real credentials and replace the external HTTP boundary, exercising validation, models, error mapping, pagination, retry decisions, signed webhook payloads, concurrent duplicate handling and correlation headers. Coverage is enforced at 80% or above. CI also checks lint, regenerated OpenAPI consistency, Docker build and a running-container health/schema smoke test.
 
-- app/models.py
-  - Request and response models
-
-- app/storage.py
-  - Local webhook event storage
-
-- app/webhook.py
-  - Signature verification
-
-- tests/
-  - Unit tests
-
----
-
-## Error Mapping
-
-GitHub responses are translated into FastAPI HTTPExceptions.
-
-Examples include:
-
-- 400 Bad Request
-- 401 Unauthorized
-- 404 Not Found
-- 422 Validation Error
-
-This provides consistent responses while preserving GitHub error messages.
-
----
-
-## Pagination
-
-The GET /issues endpoint forwards GitHub pagination parameters.
-
-Supported query parameters include:
-
-- page
-- per_page
-- state
-- labels
-
-GitHub Link headers are forwarded to the client whenever available.
-
----
-
-## Webhook Processing
-
-The webhook endpoint supports:
-
-- issues
-- issue_comment
-- ping
-
-Each incoming request is verified using HMAC SHA-256 with the configured WEBHOOK_SECRET.
-
-Only valid webhook requests are processed.
-
----
-
-## Idempotency
-
-GitHub may retry webhook deliveries.
-
-To avoid duplicate processing, delivery IDs are stored in memory.
-
-If the same delivery ID is received again, it is ignored.
-
----
-
-## Security
-
-Security considerations include:
-
-- Environment variables for secrets
-- HMAC SHA-256 verification
-- Constant-time signature comparison
-- No secrets logged
-- GitHub Personal Access Token stored outside source code
-
----
-
-## Testing
-
-The project includes unit tests covering:
-
-- Request models
-- Issue formatting
-- Webhook signature verification
-- Event storage
-
-All tests pass successfully using pytest.
-
----
-
-## Docker Support
-
-The application can be started using Docker or directly with Uvicorn.
-
-Docker Compose is also included for local development.
-
----
-
-## Future Improvements
-
-Possible enhancements include:
-
-- SQLite event persistence
-- GitHub rate-limit retry strategy
-- Conditional GET using ETag
-- GitHub Actions CI pipeline
-- Request IDs for structured logging
+The live suite is explicitly opt-in against an already running, GitHub-connected service. It exercises create/get/update/close/reopen, comment create/fetch, and actual matching webhook receipt, then closes its own test issue. Its result must be recorded separately after credentials and the webhook are configured; offline success does not establish live connectivity.

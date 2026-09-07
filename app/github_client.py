@@ -1,3 +1,6 @@
+import math
+import time
+from email.utils import parsedate_to_datetime
 
 import httpx
 
@@ -28,16 +31,69 @@ class GitHubClient:
 
         logger.info("%s %s", method, url)
 
-        response = httpx.request(
-            method=method,
-            url=url,
-            headers=self.headers,
-            timeout=30,
-            **kwargs,
-        )
+        # Only reads are retried: a failed write may already have reached GitHub.
+        for attempt in range(3):
+            try:
+                response = httpx.request(
+                    method=method, url=url, headers=self.headers, timeout=30, **kwargs
+                )
+            except httpx.RequestError:
+                return httpx.Response(
+                    503,
+                    headers={"Retry-After": "1"},
+                    json={
+                        "message": "GitHub could not be reached. For a write, check its outcome before retrying."
+                    },
+                )
 
-        logger.info("GitHub Response: %s", response.status_code)
+            logger.info("GitHub Response: %s", response.status_code)
+            rate_limited = response.status_code == 429 or (
+                response.status_code == 403
+                and (
+                    response.headers.get("X-RateLimit-Remaining") == "0"
+                    or "Retry-After" in response.headers
+                    or "rate limit" in response.text.lower()
+                )
+            )
+            if rate_limited:
+                response.status_code = 429
+            if not (rate_limited or response.status_code >= 500):
+                return response
 
+            delay = 0.25 * 2**attempt
+            retry_after = response.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    delay = float(retry_after)
+                except ValueError:
+                    try:
+                        delay = max(
+                            0,
+                            parsedate_to_datetime(retry_after).timestamp()
+                            - time.time(),
+                        )
+                    except (ValueError, TypeError, OverflowError):
+                        delay = 60
+                        retry_after = None
+            elif rate_limited:
+                try:
+                    delay = max(
+                        1, float(response.headers["X-RateLimit-Reset"]) - time.time()
+                    )
+                except (KeyError, ValueError):
+                    delay = 60
+            if not math.isfinite(delay):
+                delay = 60
+                retry_after = None
+            if delay < 0:
+                delay = 60
+                retry_after = None
+            # Surface long waits to the caller instead of occupying a request worker.
+            if method != "GET" or attempt == 2 or delay > 1:
+                if not retry_after:
+                    response.headers["Retry-After"] = str(max(1, math.ceil(delay)))
+                return response
+            time.sleep(delay)
         return response
 
     def create_issue(self, payload: dict):
@@ -90,6 +146,14 @@ class GitHubClient:
             "POST",
             f"/repos/{settings.GITHUB_OWNER}/{settings.GITHUB_REPO}/issues/{issue_number}/comments",
             json=payload,
+        )
+
+    def list_comments(self, issue_number: int, params: dict):
+        """Retrieve issue comments while preserving GitHub pagination."""
+        return self._request(
+            "GET",
+            f"/repos/{settings.GITHUB_OWNER}/{settings.GITHUB_REPO}/issues/{issue_number}/comments",
+            params=params,
         )
 
 

@@ -1,28 +1,45 @@
-"""
-CMPE 272 - Homework #2
-Pydantic Models
+"""Request and response schemas for the GitHub service.
 
-Author: Pranith Varma
+Original author: Pranith Varma. Requirements corrections assisted by Codex.
 """
 
-from typing import List, Optional
-from pydantic import BaseModel, Field
+from typing import Annotated, Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+Title = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=256)
+]
+CommentBody = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class CreateIssueRequest(BaseModel):
-    title: str = Field(..., min_length=1, max_length=256)
-    body: Optional[str] = None
-    labels: Optional[List[str]] = []
+    title: Title
+    body: str | None = None
+    labels: list[str] | None = Field(default_factory=list)
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"title": "Fix login", "body": "Steps to reproduce", "labels": ["bug"]}
+            ]
+        }
+    )
 
 
 class UpdateIssueRequest(BaseModel):
-    title: Optional[str] = None
-    body: Optional[str] = None
-    state: Optional[str] = Field(default=None, pattern="^(open|closed)$")
+    title: Title | None = None
+    body: str | None = None
+    state: Literal["open", "closed"] | None = None
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"title": "Fixed login", "state": "closed"}]}
+    )
 
 
 class CreateCommentRequest(BaseModel):
-    body: str = Field(..., min_length=1)
+    body: CommentBody
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"body": "Confirmed the fix."}]}
+    )
 
 
 class IssueResponse(BaseModel):
@@ -30,10 +47,26 @@ class IssueResponse(BaseModel):
     html_url: str
     state: str
     title: str
-    body: Optional[str]
-    labels: List[str]
+    body: str | None
+    labels: list[str]
     created_at: str
     updated_at: str
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "number": 1,
+                    "html_url": "https://github.com/example/repo/issues/1",
+                    "state": "open",
+                    "title": "Fix login",
+                    "body": None,
+                    "labels": ["bug"],
+                    "created_at": "2026-09-01T00:00:00Z",
+                    "updated_at": "2026-09-01T00:00:00Z",
+                }
+            ]
+        }
+    )
 
 
 class CommentResponse(BaseModel):
@@ -42,8 +75,24 @@ class CommentResponse(BaseModel):
     user: str
     created_at: str
     html_url: str
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": 2,
+                    "body": "Confirmed the fix.",
+                    "user": "example",
+                    "created_at": "2026-09-01T00:00:00Z",
+                    "html_url": "https://github.com/example/repo/issues/1#issuecomment-2",
+                }
+            ]
+        }
+    )
 
 
 class ErrorResponse(BaseModel):
     error: str
-    detail: Optional[str] = None
+    detail: Any = None
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"error": "not_found", "detail": "Not Found"}]}
+    )

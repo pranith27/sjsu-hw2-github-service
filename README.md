@@ -1,932 +1,144 @@
 # GitHub Issues Service
 
-## CMPE 272 – Homework #2
+CMPE 272 Homework 2: a FastAPI gateway for issues and comments in one configured GitHub repository. It verifies signed GitHub webhooks, keeps a process-local event log, and ships an OpenAPI 3.1 contract, offline regression tests, opt-in live integration tests, and Docker/CI checks.
 
-A production-style REST API built with **FastAPI** that wraps the **GitHub REST API** for managing issues and comments within a single GitHub repository.
+Original implementation: Pranith Varma. Requirements remediation and review: Bernie Miao using AI coding assistance. Team members: Pranith Varma, Bernie Miao, Swaroop, Weihao Fu. Each member should confirm their actual contribution in the final report.
 
-The application exposes its own REST endpoints while communicating with GitHub in the background. It also validates GitHub Webhooks using **HMAC SHA-256**, stores processed webhook events for debugging, and automatically generates an **OpenAPI 3.1** specification.
+## Run locally
 
----
+Use Python 3.12 or later. From the repository root:
 
-# Project Overview
-
-This project was developed for **CMPE 272 – Enterprise Software Platforms**.
-
-Instead of interacting directly with the GitHub Issues API, clients communicate with this service. The service performs validation, forwards requests to GitHub, translates responses, and verifies incoming webhook events.
-
-The project follows common backend development practices including:
-
-- RESTful API design
-- Environment-based configuration
-- OpenAPI documentation
-- Webhook signature verification
-- Request validation using Pydantic
-- Docker containerization
-- Automated unit testing
-- Structured logging
-- Modular project organization
-
----
-
-# Features
-
-The service implements the following functionality:
-
-## GitHub Issues
-
-- Create GitHub issues
-- Retrieve repository issues
-- Retrieve an individual issue
-- Update issue title
-- Update issue body
-- Close issues
-- Reopen issues
-
-## GitHub Comments
-
-- Create comments on existing issues
-
-## Webhooks
-
-- Verify HMAC SHA-256 webhook signatures
-- Support GitHub **issues** events
-- Support GitHub **issue_comment** events
-- Support **ping** events
-- Ignore duplicate webhook deliveries (idempotent processing)
-- Store processed webhook events for debugging
-
-## API Documentation
-
-- FastAPI Swagger UI
-- ReDoc documentation
-- Generated OpenAPI 3.1 specification
-
-## Development
-
-- Docker support
-- Docker Compose support
-- Makefile
-- Unit tests using Pytest
-
----
-
-# Technology Stack
-
-| Technology | Purpose |
-|------------|---------|
-| Python 3.14 | Programming Language |
-| FastAPI | REST API Framework |
-| Uvicorn | ASGI Server |
-| HTTPX | GitHub API Client |
-| Pydantic | Request Validation |
-| Pydantic Settings | Environment Configuration |
-| Pytest | Unit Testing |
-| Docker | Containerization |
-| GitHub REST API | External API |
-| OpenAPI 3.1 | API Documentation |
-
----
-
-# Repository
-
-GitHub Repository
-
-https://github.com/pranith27/sjsu-hw2-github-service
-
-Repository Owner
-
-```
-pranith27
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+cp .env.example .env
+# Edit .env locally with your own credentials; do not print or screenshot them.
+make run
 ```
 
-Repository Name
+The default server is http://127.0.0.1:8000, with Swagger at `/docs`, the live schema at `/openapi.json`, and health at `/healthz`. To use a different port, export PORT before `make run` and set the same value in `.env`.
 
-```
-sjsu-hw2-github-service
-```
-
----
-
-# Repository Structure
-
-```
-.
-├── app
-│   ├── config.py
-│   ├── github_client.py
-│   ├── logger.py
-│   ├── main.py
-│   ├── models.py
-│   ├── storage.py
-│   ├── webhook.py
-│   └── routes
-│       ├── health.py
-│       ├── issues.py
-│       └── webhook.py
-│
-├── tests
-│   ├── test_issues.py
-│   ├── test_models.py
-│   ├── test_utils.py
-│   └── test_webhook.py
-│
-├── Dockerfile
-├── docker-compose.yml
-├── Makefile
-├── openapi.yaml
-├── design-note.md
-├── README.md
-└── requirements.txt
-```
-
----
-
-# Environment Variables
-
-Create a `.env` file in the project root.
-
-```env
-GITHUB_TOKEN=your_fine_grained_personal_access_token
-GITHUB_OWNER=pranith27
-GITHUB_REPO=sjsu-hw2-github-service
-WEBHOOK_SECRET=mySuperSecret123
-PORT=8000
-```
-
-### Environment Variable Description
-
-| Variable | Description |
-|-----------|-------------|
-| GITHUB_TOKEN | Fine-Grained GitHub Personal Access Token |
-| GITHUB_OWNER | Repository owner |
+| Variable | Purpose |
+|---|---|
+| GITHUB_TOKEN | Fine-grained GitHub token restricted to the test repository, Issues read/write |
+| GITHUB_OWNER | Owner of that repository |
 | GITHUB_REPO | Repository name |
-| WEBHOOK_SECRET | Shared secret used for webhook verification |
-| PORT | Application port |
+| WEBHOOK_SECRET | A new random shared secret also configured in GitHub's webhook |
+| PORT | Server port, default 8000 |
 
-> **Important**
->
-> - Never commit your `.env` file.
-> - Never expose GitHub Personal Access Tokens.
-> - Only `.env.example` is included in this repository.
+`pydantic-settings` loads the application configuration. `.env` and local environments are excluded from Git and Docker build context. If a token or webhook secret appeared in a screenshot or shared file, its owner must rotate it; removing the image does not revoke a credential.
 
----
+## Docker
 
-# Running the Project
-
-## Clone Repository
-
-```bash
-git clone https://github.com/pranith27/sjsu-hw2-github-service.git
-
-cd sjsu-hw2-github-service
-```
-
-## Create Virtual Environment
-
-```bash
-python3 -m venv venv
-```
-
-## Activate Virtual Environment
-
-macOS / Linux
-
-```bash
-source venv/bin/activate
-```
-
-Windows
-
-```powershell
-venv\Scripts\activate
-```
-
-## Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-## Start the Server
-
-```bash
-uvicorn app.main:app --reload
-```
-
-The API will start on
-
-```
-http://127.0.0.1:8000
-```
-
----
-
-# Interactive Documentation
-
-Swagger UI
-
-```
-http://127.0.0.1:8000/docs
-```
-
-ReDoc
-
-```
-http://127.0.0.1:8000/redoc
-```
-
-Generated OpenAPI JSON
-
-```
-http://127.0.0.1:8000/openapi.json
-```
-
-Generated OpenAPI YAML
-
-```
-openapi.yaml
-```
-
----
-
-# Running with Docker
-
-## Build the Docker Image
-
-```bash
+```sh
 docker build -t github-issues-service .
+docker run --rm --name github-issues-service \
+  -p 127.0.0.1:8000:8000 --env-file .env github-issues-service
 ```
 
-## Run the Container
+This example uses PORT=8000. For another port, change both port numbers and the environment value. Docker Compose reads PORT from `.env` and provides a health check:
 
-```bash
-docker run \
--p 8000:8000 \
---env-file .env \
-github-issues-service
-```
-
-## Using Docker Compose
-
-```bash
+```sh
 docker compose up --build
 ```
 
-The application will be available at
+A successful build is not a startup test: verify `/healthz` and `/openapi.json` from the running container. The image runs as a non-root user and copies only the application and schema, not local credentials.
 
-```
-http://localhost:8000
-```
+## Authentication and exposure
 
----
+The service authenticates **outbound GitHub requests** with the server's GITHUB_TOKEN. It does not accept or implement caller bearer authentication. The OpenAPI `GitHubBearer` scheme and `x-upstream-security` extension document that distinction; they are not claims that incoming requests require bearer authentication.
 
-# API Authentication
+Keep the API on localhost. For a webhook demo, expose only POST `/webhook`, not the issue-management or event-inspection routes. With the current ngrok agent:
 
-This service authenticates with GitHub using a **Fine-Grained Personal Access Token (PAT)**.
-
-The token is loaded from the `.env` file and is never hard-coded into the source code.
-
-GitHub requests automatically include the following headers:
-
-```http
-Authorization: Bearer <YOUR_GITHUB_TOKEN>
-Accept: application/vnd.github+json
-X-GitHub-Api-Version: 2022-11-28
+```sh
+ngrok http 8000 --traffic-policy-file ngrok-webhook-policy.yml
 ```
 
----
+The supplied [ngrok traffic policy](https://ngrok.com/docs/gateway/traffic-policy/actions/deny) denies requests outside the webhook path/method. Verify it with your ngrok version and plan before exposing a real-token service. No tunnel is started automatically by the application or tests.
 
-# API Endpoints
+## API examples
 
-## 1. Create Issue
+Set BASE to your local server. Substitute a real returned issue number for 123; GitHub does not delete issues, so the delete-equivalent operation closes them.
 
-**POST /issues**
+```sh
+BASE=http://127.0.0.1:8000
 
-Creates a new GitHub Issue.
+# Create: 201, JSON issue, Location header
+curl -i -X POST "$BASE/issues" -H 'Content-Type: application/json' \
+  -d '{"title":"HW2 example","body":"Created through the service","labels":[]}'
 
-### Example Request
+# List: preserves GitHub Link pagination header
+curl -i "$BASE/issues?state=open&page=1&per_page=10"
 
-```bash
-curl -X POST http://localhost:8000/issues \
--H "Content-Type: application/json" \
--d '{
-  "title":"Homework Test",
-  "body":"Created using FastAPI",
-  "labels":[]
-}'
+# Retrieve
+curl -i "$BASE/issues/123"
+
+# Update title and body
+curl -i -X PATCH "$BASE/issues/123" -H 'Content-Type: application/json' \
+  -d '{"title":"Updated example","body":"Updated body"}'
+
+# Close and reopen
+curl -i -X PATCH "$BASE/issues/123" -H 'Content-Type: application/json' -d '{"state":"closed"}'
+curl -i -X PATCH "$BASE/issues/123" -H 'Content-Type: application/json' -d '{"state":"open"}'
+
+# Create and fetch comments
+curl -i -X POST "$BASE/issues/123/comments" -H 'Content-Type: application/json' \
+  -d '{"body":"Comment from the service"}'
+curl -i "$BASE/issues/123/comments?page=1&per_page=10"
+
+# Local event inspection and health
+curl -i "$BASE/webhook/events"
+curl -i "$BASE/healthz"
+
+# Local validation error: 400, without a GitHub call
+curl -i -X POST "$BASE/issues" -H 'Content-Type: application/json' -d '{}'
 ```
 
-### Successful Response
+Issue list state must be open/closed/all, page must be positive, and per_page must be 1–100. Titles/comments reject empty or whitespace-only content. Errors use `{ "error": "code", "detail": ... }`; all responses include X-Request-ID. Invalid local inputs and GitHub validation failures return 400; authentication/permission/not-found statuses are preserved; rate limits return 429 with Retry-After; transport failures return 503.
 
-```json
-{
-  "number": 15,
-  "title": "Homework Test",
-  "state": "open",
-  "html_url": "https://github.com/pranith27/sjsu-hw2-github-service/issues/15"
-}
-```
+## Webhook setup and redelivery
 
-**HTTP Status**
+In the test repository's Settings → Webhooks, add the tunnel URL followed by `/webhook`, select `application/json`, configure the same new WEBHOOK_SECRET, and subscribe to Issues and Issue comments. GitHub also sends a ping when testing the configuration.
 
-| Status | Meaning |
-|---------|---------|
-|201|Issue created|
-|400|Invalid request body|
-|401|GitHub authentication failed|
-|500|Unexpected server error|
+The receiver verifies HMAC SHA-256 over the **exact raw bytes** with constant-time comparison before parsing JSON. It requires a delivery ID, validates event/action/payload, and acknowledges success with 204. Invalid signatures return 401; malformed payloads or unsupported events/actions return 400; bodies over 25 MiB return 413.
 
----
+To check redelivery, choose a successful delivery in GitHub's Recent Deliveries and select Redeliver. Verify another 204 and that `/webhook/events` contains no duplicate for that delivery ID/action pair. Only inspect response/summary fields in screenshots; never show tokens, secrets or raw signature values.
 
-## 2. List Issues
+The in-memory event store and dedupe set are shared within one process and lost on restart. This matches the assignment's permitted in-memory store, but is not durable multi-worker processing. The event endpoint returns recent entries; run one worker for the demo.
 
-**GET /issues**
+## Reliability and logging
 
-Returns repository issues.
+GET requests use bounded retries: at most three attempts. Short Retry-After waits of at most one second can be honored; longer waits are returned to the caller rather than tying up the worker. GitHub rate-limit 403 responses are classified separately from ordinary permission failures. GET server errors use bounded backoff.
 
-### Example
+Writes are not automatically retried, and transport errors are not automatically retried. A timed-out issue/comment creation might already have succeeded upstream; inspect the repository before repeating it. This avoids creating duplicate resources merely to hide an uncertain response.
 
-```bash
-curl "http://localhost:8000/issues?state=open&page=1&per_page=10"
-```
+Logs are JSON records with a correlation request ID. Webhook records include delivery ID, event, action and issue number. Raw payloads, signatures, credentials and exception contents are excluded from application log messages.
 
-### Query Parameters
+## Offline checks and OpenAPI
 
-| Parameter | Description |
-|------------|-------------|
-|state|open, closed, all|
-|labels|Filter by labels|
-|page|Page number|
-|per_page|Maximum 100 results|
-
----
-
-## 3. Retrieve Issue
-
-**GET /issues/{number}**
-
-### Example
-
-```bash
-curl http://localhost:8000/issues/15
-```
-
-### Response
-
-```json
-{
-  "number":15,
-  "title":"Homework Test",
-  "state":"open"
-}
-```
-
-**HTTP Status**
-
-| Status | Meaning |
-|---------|---------|
-|200|Success|
-|404|Issue not found|
-
----
-
-## 4. Update Issue
-
-**PATCH /issues/{number}**
-
-Updates the issue title, body, or state.
-
-### Example
-
-```bash
-curl -X PATCH http://localhost:8000/issues/15 \
--H "Content-Type: application/json" \
--d '{
-  "title":"Updated Issue",
-  "state":"closed"
-}'
-```
-
-### Response
-
-```json
-{
-  "number":15,
-  "state":"closed"
-}
-```
-
----
-
-## 5. Add Comment
-
-**POST /issues/{number}/comments**
-
-Creates a new GitHub comment.
-
-### Example
-
-```bash
-curl -X POST http://localhost:8000/issues/15/comments \
--H "Content-Type: application/json" \
--d '{
-  "body":"This comment was created through the FastAPI service."
-}'
-```
-
-### Successful Response
-
-```json
-{
-  "id":123456789,
-  "body":"This comment was created through the FastAPI service."
-}
-```
-
----
-
-## 6. GitHub Webhook
-
-**POST /webhook**
-
-Receives webhook events from GitHub.
-
-Supported events
-
-- ping
-- issues
-- issue_comment
-
-GitHub automatically includes
-
-```
-X-GitHub-Event
-```
-
-```
-X-GitHub-Delivery
-```
-
-```
-X-Hub-Signature-256
-```
-
-The service verifies the webhook using **HMAC SHA-256** before processing the payload.
-
-### Successful Response
-
-```
-HTTP 204 No Content
-```
-
-### Invalid Signature
-
-```
-HTTP 401 Unauthorized
-```
-
-### Unsupported Event
-
-```
-HTTP 400 Bad Request
-```
-
----
-
-## 7. List Processed Webhook Events
-
-**GET /webhook/events**
-
-Returns recently processed webhook events.
-
-### Example
-
-```bash
-curl http://localhost:8000/webhook/events
-```
-
-### Example Response
-
-```json
-[
-  {
-    "delivery_id":"123abc",
-    "event":"issues",
-    "action":"opened",
-    "issue_number":15,
-    "timestamp":"2026-09-05T18:23:41+00:00"
-  }
-]
-```
-
----
-
-## 8. Health Check
-
-**GET /healthz**
-
-Returns the current application health.
-
-### Example
-
-```bash
-curl http://localhost:8000/healthz
-```
-
-### Response
-
-```json
-{
-  "status":"healthy",
-  "service":"GitHub Issues Service",
-  "version":"1.0.0"
-}
-```
-
----
-
-# HTTP Status Codes
-
-| Status Code | Description |
-|--------------|-------------|
-|200|Successful request|
-|201|Resource created|
-|204|Webhook processed successfully|
-|400|Invalid request|
-|401|Authentication or webhook signature failure|
-|404|GitHub resource not found|
-|500|Unexpected internal server error|
-
----
-
-# Pagination
-
-The **GET /issues** endpoint forwards GitHub pagination parameters directly to the GitHub REST API.
-
-Supported parameters include
-
-- state
-- labels
-- page
-- per_page
-
-GitHub pagination headers (such as `Link`) are preserved whenever available, allowing clients to navigate through multiple pages of results while maintaining GitHub's pagination semantics.
-
----
-
-# Webhook Configuration
-
-GitHub Webhooks were configured to notify this service whenever issue-related events occur.
-
-## Configure the Webhook
-
-Navigate to your GitHub repository.
-
-```
-Settings
-    ↓
-Webhooks
-    ↓
-Add Webhook
-```
-
-Configure the webhook as follows.
-
-### Payload URL
-
-```
-https://<your-ngrok-domain>/webhook
-```
-
-### Content Type
-
-```
-application/json
-```
-
-### Secret
-
-```
-mySuperSecret123
-```
-
-This value must match the `WEBHOOK_SECRET` environment variable configured in the application.
-
-### Events
-
-Select
-
-- Issues
-- Issue Comments
-- Ping
-
----
-
-# Webhook Processing
-
-Incoming webhook requests are validated before processing.
-
-The application performs the following steps:
-
-1. Receive the webhook payload.
-2. Read the `X-Hub-Signature-256` header.
-3. Generate a SHA-256 HMAC using the shared secret.
-4. Compare the generated signature using `hmac.compare_digest()`.
-5. Reject invalid requests.
-6. Store valid webhook events in memory.
-7. Return **HTTP 204 No Content** immediately.
-
-Supported webhook events include
-
-- ping
-- issues
-- issue_comment
-
-Unsupported events return
-
-```
-HTTP 400 Bad Request
-```
-
-Invalid signatures return
-
-```
-HTTP 401 Unauthorized
-```
-
----
-
-# Idempotent Webhook Handling
-
-GitHub may retry webhook deliveries if a previous delivery times out or fails.
-
-To prevent duplicate processing, the application stores previously processed GitHub Delivery IDs.
-
-If a duplicate delivery is received, it is ignored without creating another event.
-
-This makes webhook processing **idempotent** and retry-safe.
-
----
-
-# Webhook Redelivery
-
-GitHub allows previously delivered webhooks to be resent.
-
-To redeliver an event
-
-```
-Repository Settings
-        ↓
-Webhooks
-        ↓
-Recent Deliveries
-        ↓
-Select Delivery
-        ↓
-Redeliver
-```
-
-After redelivery, the application verifies the webhook signature again and ignores duplicate deliveries if they were already processed.
-
----
-
-# Logging
-
-Application logs include useful debugging information.
-
-Examples include
-
-- Application startup
-- Incoming webhook events
-- GitHub request status
-- Webhook delivery IDs
-- Issue numbers
-- Event actions
-
-Sensitive information such as GitHub tokens and webhook secrets are never logged.
-
----
-
-# OpenAPI Specification
-
-FastAPI automatically generates an OpenAPI 3.1 specification for the service.
-
-The generated specification is included as
-
-```
-openapi.yaml
-```
-
-The specification documents
-
-- Request models
-- Response models
-- HTTP status codes
-- Endpoint descriptions
-- Validation rules
-
-Interactive documentation is available at
-
-Swagger UI
-
-```
-http://localhost:8000/docs
-```
-
-ReDoc
-
-```
-http://localhost:8000/redoc
-```
-
----
-
-# Testing
-
-The project includes automated unit tests using **Pytest**.
-
-Run all tests
-
-```bash
-pytest
-```
-
-or
-
-```bash
-python -m pytest
-```
-
-or
-
-```bash
+```sh
+make lint
 make test
+make openapi
 ```
 
-Current test suite
+`make test` excludes live tests, uses dummy settings, blocks external HTTP in offline tests, and enforces at least 80% application line coverage. It covers real routes with the external HTTP boundary mocked: validation, issue/comment behavior, upstream errors/pagination/rate limits, HMAC checks, action validation, deduplication and request IDs.
 
-```
-9 tests passed
-```
+`make openapi` explicitly exports YAML from the application's schema; FastAPI does not write that YAML file automatically. CI verifies that the committed file matches the generated contract, then builds and starts a container using dummy settings. CI performs lint, offline tests/coverage, schema consistency, image build and startup checks without GitHub secrets.
 
-The tests verify
+## Live integration verification
 
-- Request model validation
-- Issue formatting
-- Webhook signature verification
-- Invalid webhook signatures
-- Duplicate webhook handling
-- Event storage
-- Route validation
-- Health endpoint
-- Utility functions
+This is a separate test against an already running service configured with **your rotated credentials** and a working real GitHub webhook. It creates an issue and a comment, changes that issue's state, waits for actual webhook deliveries, and closes its own issue afterward. It never runs merely because GITHUB_TOKEN exists.
 
-Example output
-
-```
-=========================
-9 passed in 0.16s
-=========================
+```sh
+LIVE_SERVICE_URL=http://127.0.0.1:8000 make integration
 ```
 
----
+The test explicitly enables RUN_LIVE_INTEGRATION. It checks create/get, updating title/body, close/reopen, comment creation/retrieval, and matching issue/comment events received by the service. A missing URL or missing webhook evidence fails rather than silently passing. Use only a dedicated test repository. Record the actual result; passing offline tests is not proof that this live flow has completed.
 
-# Docker Support
+## Submission evidence
 
-The application includes
+Submit a Word document with screenshots, repository URL, and a concise explanation of the implementation. Include the actual offline coverage output, a successful **running-container** health check, and the real integration result after rerunning with rotated credentials. Do not claim an unexecuted live test passed. Keep the design note within two pages when rendering it.
 
-- Dockerfile
-- docker-compose.yml
-
-The Docker image contains all required dependencies and can be started using
-
-```bash
-docker compose up --build
-```
-
-or
-
-```bash
-docker run \
--p 8000:8000 \
---env-file .env \
-github-issues-service
-```
-
----
-
-# Security
-
-The application follows several security best practices.
-
-- Environment variables are used for configuration.
-- GitHub Personal Access Tokens are never hard-coded.
-- `.env` is excluded from Git.
-- Webhook requests are verified using HMAC SHA-256.
-- Constant-time comparison is performed using `hmac.compare_digest()`.
-- Unsupported webhook events are rejected.
-- Duplicate webhook deliveries are ignored.
-- GitHub authentication uses a Fine-Grained Personal Access Token.
-- Secrets are never logged.
-
----
-
-# Design Highlights
-
-The application follows a modular architecture to improve readability and maintainability.
-
-## Configuration
-
-Application configuration is centralized using Pydantic Settings.
-
-## GitHub Client
-
-A dedicated GitHub client manages all communication with the GitHub REST API.
-
-## Routing
-
-Endpoints are separated into dedicated FastAPI routers.
-
-- Health
-- Issues
-- Webhook
-
-## Validation
-
-Request payloads are validated using Pydantic models before processing.
-
-## Webhook Processing
-
-Webhook verification and event storage are isolated from API routes to keep responsibilities separate.
-
-## Documentation
-
-FastAPI automatically generates the OpenAPI specification and interactive documentation.
-
-## Deployment
-
-The project supports both local execution and Docker deployment.
-
----
-
-# Submission Artifacts
-
-The repository includes all required submission files.
-
-- README.md
-- openapi.yaml
-- Dockerfile
-- docker-compose.yml
-- Makefile
-- design-note.md
-- Unit tests
-- OpenAPI documentation
-
----
-
-# Screenshots
-
-The `Documentation/Screenshots` directory contains screenshots demonstrating
-
-- Swagger UI
-- Health endpoint
-- Issue creation
-- List issues
-- Retrieve issue
-- Update issue
-- Add comment
-- GitHub webhook delivery
-- Stored webhook events
-- Successful test execution
-- Docker execution
-- OpenAPI documentation
-
-These screenshots are also included in the submitted report.
-
----
-
-# Future Improvements
-
-Possible future enhancements include
-
-- SQLite database for webhook persistence
-- GitHub OAuth authentication
-- Support for multiple repositories
-- Asynchronous background webhook processing
-- Additional webhook event types
-- CI/CD deployment pipeline
-- Integration test automation using GitHub Actions
-
----
-
-# Students
-
-**Pranith Varma, Bernie, Swaroop, Weihao Fu**
-
-CMPE 272 – Enterprise Software Platforms
-
-Department of Software Engineering
-
-San José State University
-
----
+[Design note](design-note.md) · [OpenAPI contract](openapi.yaml) · [Tests](tests/)

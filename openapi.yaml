@@ -1,72 +1,54 @@
 openapi: 3.1.0
 info:
   title: GitHub Issues Service API
-  summary: REST API wrapper for GitHub Issues
-  description: '
-
-    A production-style REST API built with **FastAPI** that wraps the GitHub REST
-    API
-
-    for managing issues and comments within a single GitHub repository.
-
-
-    ## Features
-
-
-    - Create GitHub Issues
-
-    - List Repository Issues
-
-    - Retrieve Individual Issues
-
-    - Update Issue Title, Body, and State
-
-    - Add Comments to Issues
-
-    - Verify GitHub Webhook Signatures (HMAC SHA-256)
-
-    - Process Issue and Issue Comment Events
-
-    - Store Webhook Events for Debugging
-
-    - OpenAPI 3.1 Documentation
-
-    - Docker Support
-
-    - Automated Unit Tests
-
-
-    Developed as part of **CMPE 272 - Homework #2**.
-
-    '
+  summary: A single-repository GitHub Issues gateway
+  description: 'Issues, comments, signed webhooks and local event inspection. GITHUB_TOKEN
+    supplies the service''s outbound GitHub bearer credential. Caller authentication
+    is not implemented: run on localhost and expose only /webhook through a tunnel.'
   version: 1.0.0
 paths:
   /:
     get:
       tags:
       - Health
-      summary: Root Endpoint
-      description: Returns basic information about the GitHub Issues Service API.
+      summary: Root
       operationId: root__get
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Root  Get
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
   /healthz:
     get:
       tags:
       - Health
-      summary: Health Check
-      description: Returns the current health status of the application.
+      summary: Health
       operationId: health_healthz_get
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Health Healthz Get
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
   /issues:
     post:
       tags:
@@ -84,13 +66,104 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+              schema:
+                $ref: '#/components/schemas/IssueResponse'
+          headers:
+            Location:
+              description: Location of the created resource
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '400':
+          description: Invalid request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '401':
+          description: GitHub authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '403':
+          description: GitHub access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '429':
+          description: GitHub rate limit exceeded
+          headers:
+            Retry-After:
+              description: Delay in seconds or HTTP date before retrying
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '503':
+          description: GitHub temporarily unavailable
+          headers:
+            Retry-After:
+              description: Delay in seconds or HTTP date before retrying
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      x-upstream-security:
+      - GitHubBearer: []
     get:
       tags:
       - Issues
@@ -101,6 +174,10 @@ paths:
         in: query
         required: false
         schema:
+          enum:
+          - open
+          - closed
+          - all
           type: string
           default: open
           title: State
@@ -117,6 +194,7 @@ paths:
         required: false
         schema:
           type: integer
+          minimum: 1
           default: 1
           title: Page
       - name: per_page
@@ -124,6 +202,8 @@ paths:
         required: false
         schema:
           type: integer
+          maximum: 100
+          minimum: 1
           default: 30
           title: Per Page
       responses:
@@ -131,13 +211,107 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IssueResponse'
+                title: Response List Issues Issues Get
+          headers:
+            Link:
+              description: GitHub pagination links
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '400':
+          description: Invalid request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '401':
+          description: GitHub authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '403':
+          description: GitHub access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '429':
+          description: GitHub rate limit exceeded
+          headers:
+            Retry-After:
+              description: Delay in seconds or HTTP date before retrying
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '503':
+          description: GitHub temporarily unavailable
+          headers:
+            Retry-After:
+              description: Delay in seconds or HTTP date before retrying
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      x-upstream-security:
+      - GitHubBearer: []
   /issues/{issue_number}:
     get:
       tags:
@@ -156,13 +330,100 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+              schema:
+                $ref: '#/components/schemas/IssueResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '400':
+          description: Invalid request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '401':
+          description: GitHub authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '403':
+          description: GitHub access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '429':
+          description: GitHub rate limit exceeded
+          headers:
+            Retry-After:
+              description: Delay in seconds or HTTP date before retrying
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '503':
+          description: GitHub temporarily unavailable
+          headers:
+            Retry-After:
+              description: Delay in seconds or HTTP date before retrying
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      x-upstream-security:
+      - GitHubBearer: []
     patch:
       tags:
       - Issues
@@ -186,13 +447,100 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+              schema:
+                $ref: '#/components/schemas/IssueResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '400':
+          description: Invalid request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '401':
+          description: GitHub authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '403':
+          description: GitHub access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '429':
+          description: GitHub rate limit exceeded
+          headers:
+            Retry-After:
+              description: Delay in seconds or HTTP date before retrying
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '503':
+          description: GitHub temporarily unavailable
+          headers:
+            Retry-After:
+              description: Delay in seconds or HTTP date before retrying
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      x-upstream-security:
+      - GitHubBearer: []
   /issues/{issue_number}/comments:
     post:
       tags:
@@ -217,13 +565,239 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+              schema:
+                $ref: '#/components/schemas/CommentResponse'
+          headers:
+            Location:
+              description: Location of the created resource
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '400':
+          description: Invalid request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '401':
+          description: GitHub authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '403':
+          description: GitHub access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '429':
+          description: GitHub rate limit exceeded
+          headers:
+            Retry-After:
+              description: Delay in seconds or HTTP date before retrying
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '503':
+          description: GitHub temporarily unavailable
+          headers:
+            Retry-After:
+              description: Delay in seconds or HTTP date before retrying
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      x-upstream-security:
+      - GitHubBearer: []
+    get:
+      tags:
+      - Issues
+      summary: List Comments
+      operationId: list_comments_issues__issue_number__comments_get
+      parameters:
+      - name: issue_number
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Issue Number
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          title: Page
+      - name: per_page
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 30
+          title: Per Page
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CommentResponse'
+                title: Response List Comments Issues  Issue Number  Comments Get
+          headers:
+            Link:
+              description: GitHub pagination links
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '401':
+          description: GitHub authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '403':
+          description: GitHub access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '429':
+          description: GitHub rate limit exceeded
+          headers:
+            Retry-After:
+              description: Delay in seconds or HTTP date before retrying
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '503':
+          description: GitHub temporarily unavailable
+          headers:
+            Retry-After:
+              description: Delay in seconds or HTTP date before retrying
+              schema:
+                type: string
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      x-upstream-security:
+      - GitHubBearer: []
   /webhook:
     post:
       tags:
@@ -235,44 +809,182 @@ paths:
         in: header
         required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           title: X-Hub-Signature-256
       - name: x-github-event
         in: header
         required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           title: X-Github-Event
       - name: x-github-delivery
         in: header
         required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           title: X-Github-Delivery
       responses:
         '204':
           description: Successful Response
-        '422':
-          description: Validation Error
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '400':
+          description: Invalid event, delivery ID or payload
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '401':
+          description: Invalid or missing HMAC signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+        '413':
+          description: Webhook body exceeds 25 MiB
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
+      requestBody:
+        required: true
+        description: Raw GitHub JSON, at most 25 MiB. Sign the exact request bytes
+          with HMAC-SHA256 in X-Hub-Signature-256; send X-GitHub-Event and a nonempty
+          X-GitHub-Delivery. issues and issue_comment require a supported action and
+          a positive issue.number; ping requires only a JSON object.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum:
+                  - assigned
+                  - closed
+                  - created
+                  - deleted
+                  - demilestoned
+                  - edited
+                  - field_added
+                  - field_removed
+                  - labeled
+                  - locked
+                  - milestoned
+                  - opened
+                  - pinned
+                  - reopened
+                  - transferred
+                  - typed
+                  - unassigned
+                  - unlabeled
+                  - unlocked
+                  - unpinned
+                  - untyped
+                issue:
+                  type: object
+                  properties:
+                    number:
+                      type: integer
+                      minimum: 1
+                  required:
+                  - number
+            examples:
+              issues_opened:
+                summary: 'X-GitHub-Event: issues'
+                value:
+                  action: opened
+                  issue:
+                    number: 1
+              comment_created:
+                summary: 'X-GitHub-Event: issue_comment'
+                value:
+                  action: created
+                  issue:
+                    number: 1
+              ping:
+                summary: 'X-GitHub-Event: ping'
+                value:
+                  zen: Keep it logically awesome.
   /webhook/events:
     get:
       tags:
       - Webhook
       summary: Events
-      description: Return recently processed webhook events.
+      description: Return recently processed webhook event summaries.
       operationId: events_webhook_events_get
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                items:
+                  $ref: '#/components/schemas/EventResponse'
+                type: array
+                title: Response Events Webhook Events Get
+          headers:
+            X-Request-ID:
+              description: Request correlation ID
+              schema:
+                type: string
 components:
   schemas:
+    CommentResponse:
+      properties:
+        id:
+          type: integer
+          title: Id
+        body:
+          type: string
+          title: Body
+        user:
+          type: string
+          title: User
+        created_at:
+          type: string
+          title: Created At
+        html_url:
+          type: string
+          title: Html Url
+      type: object
+      required:
+      - id
+      - body
+      - user
+      - created_at
+      - html_url
+      title: CommentResponse
+      examples:
+      - body: Confirmed the fix.
+        created_at: '2026-09-01T00:00:00Z'
+        html_url: https://github.com/example/repo/issues/1#issuecomment-2
+        id: 2
+        user: example
     CreateCommentRequest:
       properties:
         body:
@@ -283,6 +995,8 @@ components:
       required:
       - body
       title: CreateCommentRequest
+      examples:
+      - body: Confirmed the fix.
     CreateIssueRequest:
       properties:
         title:
@@ -302,11 +1016,59 @@ components:
             type: array
           - type: 'null'
           title: Labels
-          default: []
       type: object
       required:
       - title
       title: CreateIssueRequest
+      examples:
+      - body: Steps to reproduce
+        labels:
+        - bug
+        title: Fix login
+    ErrorResponse:
+      properties:
+        error:
+          type: string
+          title: Error
+        detail:
+          title: Detail
+      type: object
+      required:
+      - error
+      title: ErrorResponse
+      examples:
+      - detail: Not Found
+        error: not_found
+    EventResponse:
+      properties:
+        delivery_id:
+          type: string
+          title: Delivery Id
+        event:
+          type: string
+          title: Event
+        action:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Action
+        issue_number:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Issue Number
+        timestamp:
+          type: string
+          format: date-time
+          title: Timestamp
+      type: object
+      required:
+      - delivery_id
+      - event
+      - action
+      - issue_number
+      - timestamp
+      title: EventResponse
     HTTPValidationError:
       properties:
         detail:
@@ -316,11 +1078,63 @@ components:
           title: Detail
       type: object
       title: HTTPValidationError
+    IssueResponse:
+      properties:
+        number:
+          type: integer
+          title: Number
+        html_url:
+          type: string
+          title: Html Url
+        state:
+          type: string
+          title: State
+        title:
+          type: string
+          title: Title
+        body:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Body
+        labels:
+          items:
+            type: string
+          type: array
+          title: Labels
+        created_at:
+          type: string
+          title: Created At
+        updated_at:
+          type: string
+          title: Updated At
+      type: object
+      required:
+      - number
+      - html_url
+      - state
+      - title
+      - body
+      - labels
+      - created_at
+      - updated_at
+      title: IssueResponse
+      examples:
+      - created_at: '2026-09-01T00:00:00Z'
+        html_url: https://github.com/example/repo/issues/1
+        labels:
+        - bug
+        number: 1
+        state: open
+        title: Fix login
+        updated_at: '2026-09-01T00:00:00Z'
     UpdateIssueRequest:
       properties:
         title:
           anyOf:
           - type: string
+            maxLength: 256
+            minLength: 1
           - type: 'null'
           title: Title
         body:
@@ -331,11 +1145,16 @@ components:
         state:
           anyOf:
           - type: string
-            pattern: ^(open|closed)$
+            enum:
+            - open
+            - closed
           - type: 'null'
           title: State
       type: object
       title: UpdateIssueRequest
+      examples:
+      - state: closed
+        title: Fixed login
     ValidationError:
       properties:
         loc:
@@ -362,4 +1181,9 @@ components:
       - msg
       - type
       title: ValidationError
-
+  securitySchemes:
+    GitHubBearer:
+      type: http
+      scheme: bearer
+      description: Server-managed GitHub token from GITHUB_TOKEN. It is not accepted
+        from caller headers.
