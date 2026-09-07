@@ -22,6 +22,6 @@ Credentials remain outside source and image layers. Docker copies only the appli
 
 ## Verification
 
-Offline tests run without real credentials and replace the external HTTP boundary, exercising validation, models, error mapping, pagination, retry decisions, signed webhook payloads, concurrent duplicate handling and correlation headers. Coverage is enforced at 80% or above. CI also checks lint, regenerated OpenAPI consistency, Docker build and a running-container health/schema smoke test.
+Offline tests run without real credentials and replace the external HTTP boundary, exercising validation, models, error mapping, pagination, retry decisions, signed webhook payloads, concurrent duplicate handling and correlation headers. Coverage is enforced at 80% or above. Local verification also checked lint, regenerated OpenAPI consistency, Docker build and a running-container health/schema smoke test.
 
 The live suite is explicitly opt-in against an already running, GitHub-connected service. It exercises create/get/update/close/reopen, comment create/fetch, and actual matching webhook receipt, then closes its own test issue. Its result must be recorded separately after credentials and the webhook are configured; offline success does not establish live connectivity.

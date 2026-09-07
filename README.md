@@ -1,6 +1,6 @@
 # GitHub Issues Service
 
-CMPE 272 Homework 2: a FastAPI gateway for issues and comments in one configured GitHub repository. It verifies signed GitHub webhooks, keeps a process-local event log, and ships an OpenAPI 3.1 contract, offline regression tests, opt-in live integration tests, and Docker/CI checks.
+CMPE 272 Homework 2: a FastAPI gateway for issues and comments in one configured GitHub repository. It verifies signed GitHub webhooks, keeps a process-local event log, and ships an OpenAPI 3.1 contract, offline regression tests, opt-in live integration tests, and Docker startup checks.
 
 Original implementation: Pranith Varma. Requirements remediation and review: Bernie Miao using AI coding assistance. Team members: Pranith Varma, Bernie Miao, Swaroop, Weihao Fu. Each member should confirm their actual contribution in the final report.
 
@@ -125,7 +125,7 @@ make openapi
 
 `make test` excludes live tests, uses dummy settings, blocks external HTTP in offline tests, and enforces at least 80% application line coverage. It covers real routes with the external HTTP boundary mocked: validation, issue/comment behavior, upstream errors/pagination/rate limits, HMAC checks, action validation, deduplication and request IDs.
 
-`make openapi` explicitly exports YAML from the application's schema; FastAPI does not write that YAML file automatically. CI verifies that the committed file matches the generated contract, then builds and starts a container using dummy settings. CI performs lint, offline tests/coverage, schema consistency, image build and startup checks without GitHub secrets.
+`make openapi` explicitly exports YAML from the application's schema; FastAPI does not write that YAML file automatically. Lint, offline tests, schema consistency, and Docker startup were checked locally using dummy settings.
 
 ## Live integration verification
 
