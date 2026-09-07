@@ -1,12 +1,5 @@
-"""
-CMPE 272
-GitHub Webhook Utilities
-
-Author: Pranith Varma
-"""
-
-import hmac
 import hashlib
+import hmac
 
 from app.config import settings
 

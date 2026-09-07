@@ -27,6 +27,16 @@ app.include_router(health_router)
 app.include_router(issues_router)
 app.include_router(webhook_router)
 
+@app.get("/healthz", tags=["Health"])
+def health():
+    """
+    Health check endpoint.
+    """
+    return {
+        "status": "healthy",
+        "service": "GitHub Issues Service"
+    }
+
 
 @app.on_event("startup")
 async def startup():
