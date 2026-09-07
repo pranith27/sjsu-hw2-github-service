@@ -5,7 +5,7 @@ Webhook Event Storage
 Author: Pranith Varma
 """
 
-from datetime import datetime
+from datetime import datetime, UTC
 
 events = []
 processed_deliveries = set()
@@ -33,7 +33,7 @@ def save_event(
             "event": event,
             "action": action,
             "issue_number": issue_number,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
     )
 
