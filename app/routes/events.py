@@ -1,11 +1,5 @@
-"""
-CMPE 272
-Webhook Event Store
 
-Author: Pranith Varma
-"""
-
-from datetime import datetime
+from datetime import UTC, datetime
 
 events = []
 processed_deliveries = set()
@@ -31,7 +25,7 @@ def save_event(
             "event": event,
             "action": action,
             "issue_number": issue_number,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(UTC).isoformat(),
         }
     )
 
