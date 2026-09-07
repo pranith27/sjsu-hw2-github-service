@@ -1,76 +1,28 @@
 # GitHub Issues Service
 ### CMPE 272 – Homework #2
 
-A RESTful GitHub Issues Service built using **FastAPI** that wraps the GitHub REST API for managing issues in a single repository. The service provides CRUD operations for GitHub Issues, issue comments, webhook handling with HMAC verification, OpenAPI documentation, Docker support, and automated testing.
+A RESTful GitHub Issues Service built with **FastAPI** that wraps the GitHub REST API for managing issues and comments for a single GitHub repository. The service also validates GitHub webhooks using HMAC SHA-256 signatures and exposes its own API documented with OpenAPI 3.1.
 
 
 ---
 
 # Project Overview
 
-This project acts as a lightweight gateway between clients and the GitHub REST API.
+This project provides a simplified REST API that communicates with the GitHub Issues API.
 
-Instead of directly calling GitHub APIs, clients communicate with this service, which:
+Features include:
 
-- Creates GitHub Issues
-- Retrieves Issues
-- Updates Issues
-- Closes/Reopens Issues
-- Creates Issue Comments
-- Receives GitHub Webhooks
-- Validates webhook signatures
-- Stores processed webhook events
-- Provides OpenAPI documentation
-- Includes Docker support
-- Includes automated tests
-
----
-
-# Features
-
-## GitHub Issues
-
-- Create Issues
-- List Issues
-- Retrieve Individual Issues
-- Update Issue Title
-- Update Issue Body
-- Close Issues
-- Reopen Issues
-
-## Comments
-
-- Create Issue Comments
-
-## GitHub Webhooks
-
-Supports:
-
-- issues
-- issue_comment
-- ping
-
-Features:
-
-- HMAC SHA-256 Signature Verification
-- Constant-Time Signature Comparison
-- Duplicate Delivery Protection
-- Local Event Storage
-- Event Logging
-
-## API Documentation
-
-Swagger UI
-
-```
-http://localhost:8000/docs
-```
-
-OpenAPI JSON
-
-```
-http://localhost:8000/openapi.json
-```
+- Create GitHub Issues
+- List repository issues
+- Retrieve a single issue
+- Update existing issues
+- Close/Reopen issues
+- Add comments to issues
+- Verify GitHub Webhook signatures
+- Receive GitHub Issue events
+- OpenAPI documentation
+- Docker support
+- Automated unit tests
 
 ---
 
@@ -80,46 +32,25 @@ http://localhost:8000/openapi.json
 - FastAPI
 - Uvicorn
 - HTTPX
-- GitHub REST API
-- Docker
-- Docker Compose
+- Pydantic
 - Pytest
+- Docker
+- GitHub REST API
 
 ---
 
-# Project Structure
+# Repository Used
+
+Repository Owner
 
 ```
-sjsu-hw2-github-service/
-│
-├── app/
-│   ├── config.py
-│   ├── github_client.py
-│   ├── logger.py
-│   ├── main.py
-│   ├── models.py
-│   ├── storage.py
-│   ├── webhook.py
-│   ├── routes/
-│   │     ├── issues.py
-│   │     └── webhook.py
-│   │
-│   └── services/
-│
-├── tests/
-│   ├── conftest.py
-│   ├── test_issues.py
-│   ├── test_utils.py
-│   └── test_webhook.py
-│
-├── Dockerfile
-├── docker-compose.yml
-├── Makefile
-├── openapi.yaml
-├── design-note.md
-├── requirements.txt
-├── README.md
-└── .env.example
+pranith27
+```
+
+Repository
+
+```
+sjsu-hw2-github-service
 ```
 
 ---
@@ -128,48 +59,67 @@ sjsu-hw2-github-service/
 
 Create a `.env` file.
 
-Example:
+```
+GITHUB_TOKEN=<your_fine_grained_token>
 
-```env
-GITHUB_TOKEN=YOUR_GITHUB_TOKEN
-GITHUB_OWNER=YOUR_GITHUB_USERNAME
-GITHUB_REPO=YOUR_REPOSITORY_NAME
-WEBHOOK_SECRET=YOUR_SECRET
+GITHUB_OWNER=pranith27
+
+GITHUB_REPO=sjsu-hw2-github-service
+
+WEBHOOK_SECRET=mySuperSecret123
+
 PORT=8000
 ```
 
-| Variable | Description |
-|-----------|-------------|
-| GITHUB_TOKEN | GitHub Fine-Grained Personal Access Token |
-| GITHUB_OWNER | GitHub Username |
-| GITHUB_REPO | Repository Name |
-| WEBHOOK_SECRET | Secret used for GitHub Webhook Signature Validation |
-| PORT | Server Port |
+**Important**
+
+- Never commit `.env`
+- Never commit GitHub tokens
+- Only `.env.example` is included in the repository.
 
 ---
 
-# GitHub Token Permissions
+# Project Structure
 
-The Fine-Grained Personal Access Token requires:
-
-- Repository Access
-- Issues → Read and Write
-
-No additional permissions are required.
+```
+.
+├── app
+│   ├── config.py
+│   ├── github_client.py
+│   ├── logger.py
+│   ├── main.py
+│   ├── models.py
+│   ├── storage.py
+│   ├── webhook.py
+│   ├── services
+│   └── routes
+│       ├── issues.py
+│       └── webhook.py
+│
+├── tests
+│   ├── test_issues.py
+│   ├── test_utils.py
+│   ├── test_webhook.py
+│   └── conftest.py
+│
+├── Dockerfile
+├── docker-compose.yml
+├── Makefile
+├── openapi.yaml
+├── design-note.md
+├── README.md
+└── requirements.txt
+```
 
 ---
 
-# Installation
+# Running Locally
 
-Clone the repository
+Clone repository
 
 ```bash
 git clone https://github.com/pranith27/sjsu-hw2-github-service.git
-```
 
-Enter the project
-
-```bash
 cd sjsu-hw2-github-service
 ```
 
@@ -181,44 +131,40 @@ python3 -m venv venv
 
 Activate
 
-Mac/Linux
+macOS/Linux
 
 ```bash
 source venv/bin/activate
 ```
 
-Windows
-
-```bash
-venv\Scripts\activate
-```
-
-Install dependencies
+Install packages
 
 ```bash
 pip install -r requirements.txt
 ```
 
----
-
-# Running the Application
-
-Start FastAPI
+Start server
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-Application
+The API will be available at
 
 ```
-http://localhost:8000
+http://127.0.0.1:8000
 ```
 
-Swagger
+Swagger UI
 
 ```
-http://localhost:8000/docs
+http://127.0.0.1:8000/docs
+```
+
+OpenAPI JSON
+
+```
+http://127.0.0.1:8000/openapi.json
 ```
 
 ---
@@ -240,7 +186,7 @@ docker run \
 github-service
 ```
 
-Or
+Or use Docker Compose
 
 ```bash
 docker compose up --build
@@ -250,119 +196,122 @@ docker compose up --build
 
 # API Endpoints
 
+## POST /issues
+
+Creates a GitHub issue.
+
+Request
+
+```json
+{
+  "title":"Webhook Test",
+  "body":"Testing GitHub webhook",
+  "labels":[]
+}
+```
+
+Successful Response
+
+```json
+{
+  "number":4,
+  "title":"Webhook Test",
+  "state":"open",
+  "html_url":"https://github.com/pranith27/sjsu-hw2-github-service/issues/4"
+}
+```
+
 ---
 
-## Create Issue
+## GET /issues
 
-POST
+Returns all repository issues.
+
+Optional query parameters
 
 ```
-/issues
+state
+page
+per_page
+labels
 ```
+
+---
+
+## GET /issues/{number}
+
+Returns a specific GitHub issue.
 
 Example
 
-```bash
-curl -X POST http://localhost:8000/issues \
--H "Content-Type: application/json" \
--d '{
-"title":"Test Issue",
-"body":"Created using FastAPI",
-"labels":[]
-}'
+```
+GET /issues/4
 ```
 
 ---
 
-## List Issues
+## PATCH /issues/{number}
 
-GET
+Updates
 
-```
-/issues
-```
+- title
+- body
+- state
 
 Example
 
-```bash
-curl "http://localhost:8000/issues?state=open"
+```json
+{
+    "title":"Updated Title",
+    "state":"closed"
+}
 ```
 
 ---
 
-## Get Issue
+## POST /issues/{number}/comments
 
-GET
+Adds a GitHub issue comment.
 
-```
-/issues/{issue_number}
-```
+Request
 
-Example
-
-```bash
-curl http://localhost:8000/issues/1
+```json
+{
+    "body":"This issue was created through my FastAPI service."
+}
 ```
 
 ---
 
-## Update Issue
+## POST /webhook
 
-PATCH
+Receives GitHub webhook events.
 
-```
-/issues/{issue_number}
-```
-
-Example
-
-```bash
-curl -X PATCH http://localhost:8000/issues/1 \
--H "Content-Type: application/json" \
--d '{
-"title":"Updated Title",
-"body":"Updated Body",
-"state":"open"
-}'
-```
-
----
-
-## Create Comment
-
-POST
-
-```
-/issues/{issue_number}/comments
-```
-
-Example
-
-```bash
-curl -X POST http://localhost:8000/issues/1/comments \
--H "Content-Type: application/json" \
--d '{
-"body":"This is a comment"
-}'
-```
-
----
-
-## Receive GitHub Webhook
-
-POST
-
-```
-/webhook
-```
-
-Supported Events
+Supported events
 
 - ping
 - issues
 - issue_comment
 
-Returns
+Webhook signatures are validated using
+
+```
+X-Hub-Signature-256
+```
+
+using
+
+```
+HMAC SHA-256
+```
+
+Invalid signatures return
+
+```
+401 Unauthorized
+```
+
+Successful requests return
 
 ```
 204 No Content
@@ -370,58 +319,38 @@ Returns
 
 ---
 
-## View Stored Events
+## GET /webhook/events
 
-GET
-
-```
-/webhook/events
-```
-
-Returns
-
-```json
-[
-  {
-    "delivery_id":"...",
-    "event":"issues",
-    "action":"opened",
-    "issue_number":5,
-    "timestamp":"..."
-  }
-]
-```
+Returns recently processed webhook events stored by the application.
 
 ---
 
-# GitHub Webhook Configuration
+## GET /healthz
 
-Create an ngrok tunnel
+Returns application health status.
 
-```bash
-ngrok http 8000
-```
+---
 
-Copy the forwarding URL
+# Webhook Configuration
 
-Example
+GitHub Repository
 
 ```
-https://example.ngrok-free.app
-```
-
-Open GitHub Repository
-
 Settings
 
-→ Webhooks
+↓
 
-→ Add Webhook
+Webhooks
+
+↓
+
+Add Webhook
+```
 
 Payload URL
 
 ```
-https://example.ngrok-free.app/webhook
+https://<your-ngrok-domain>/webhook
 ```
 
 Content Type
@@ -433,10 +362,12 @@ application/json
 Secret
 
 ```
-Same value as WEBHOOK_SECRET
+mySuperSecret123
 ```
 
 Events
+
+Select
 
 ```
 Issues
@@ -446,37 +377,47 @@ Issue Comments
 Ping
 ```
 
-Save.
-
 ---
 
-# Testing Webhooks
+# Successful Webhook Example
 
-1. Create an Issue directly on GitHub
-
-2. Observe the FastAPI logs
-
-Example
+Console Output
 
 ```
-WEBHOOK RECEIVED
-
+========== WEBHOOK RECEIVED ==========
 Event: issues
-
 Action: opened
-
-Issue: Homework Test
+Issue: Webhook Test 2
+======================================
 ```
 
-Retrieve stored events
+GitHub also successfully delivered
 
 ```
-GET /webhook/events
+POST /webhook
+
+HTTP 204
 ```
 
 ---
 
-# Running Tests
+# API Authentication
+
+The service authenticates to GitHub using a Fine-Grained Personal Access Token.
+
+GitHub REST API requests include
+
+```
+Authorization: Bearer <TOKEN>
+
+Accept: application/vnd.github+json
+```
+
+Secrets are loaded using environment variables.
+
+---
+
+# Testing
 
 Run all tests
 
@@ -484,108 +425,119 @@ Run all tests
 pytest
 ```
 
-Run a specific file
+Or
 
 ```bash
-pytest tests/test_webhook.py
+make test
 ```
 
-Run with verbose output
+Current test directory
 
-```bash
-pytest -v
 ```
+tests/
+
+├── test_issues.py
+├── test_utils.py
+├── test_webhook.py
+└── conftest.py
+```
+
+Tests include
+
+- Route validation
+- Webhook signature verification
+- GitHub API request testing
+- Utility functions
 
 ---
 
 # OpenAPI
 
-The project includes an OpenAPI 3.1 specification.
+The project includes
 
 ```
 openapi.yaml
 ```
 
-The specification documents:
+containing
 
-- Request Models
-- Response Models
-- Error Models
-- Examples
-- Security Schemes
+- Request schemas
+- Response schemas
+- Error models
+- Endpoint definitions
+
+Swagger UI is automatically available through FastAPI.
 
 ---
 
 # Security
 
-The application follows several security best practices:
+This project follows several security best practices.
 
-- Environment Variables for Secrets
-- No Hardcoded Credentials
-- Fine-Grained GitHub PAT
-- HMAC SHA-256 Webhook Validation
-- Constant-Time Signature Comparison
-- Duplicate Delivery Protection
-- Request Validation using FastAPI
-
----
-
-# Error Handling
-
-The service returns meaningful HTTP responses.
-
-Examples:
-
-| Status | Description |
-|---------|-------------|
-| 200 | Success |
-| 201 | Resource Created |
-| 204 | Webhook Accepted |
-| 400 | Invalid Request |
-| 401 | Authentication Failed |
-| 404 | Resource Not Found |
-| 422 | Validation Error |
-| 500 | Internal Server Error |
+- GitHub token stored in environment variables
+- Webhook HMAC SHA-256 verification
+- Constant-time signature comparison using `hmac.compare_digest`
+- `.env` excluded from Git
+- Fine-Grained GitHub PAT used
+- No secrets committed into the repository
 
 ---
 
-# Design Decisions
+# Design Notes
 
-- FastAPI selected for high performance and automatic OpenAPI generation.
-- GitHub REST API is accessed through a dedicated client module.
-- Webhook signature verification uses HMAC SHA-256 with constant-time comparison.
-- Processed webhook deliveries are stored locally and duplicate deliveries are ignored.
-- Environment variables are used for all sensitive configuration values.
-- Docker support enables consistent deployment across environments.
+The project design focuses on
 
----
+- Separation of routes and business logic
+- GitHub API wrapper
+- Central configuration
+- Reusable request models
+- HMAC webhook verification
+- Lightweight webhook event storage
+- Docker deployment
+- FastAPI automatic OpenAPI generation
 
-# Future Improvements
+More details are provided in
 
-- SQLite database for persistent webhook storage
-- GitHub Actions CI/CD pipeline
-- Rate-limit retry logic
-- ETag conditional GET support
-- Authentication middleware
-- Structured logging with request IDs
-- Metrics and monitoring
+```
+design-note.md
+```
 
 ---
 
-# References
+# Documentation
 
-- GitHub REST API Documentation
-- FastAPI Documentation
-- Docker Documentation
-- Pytest Documentation
+The repository also includes
 
+- README.md
+- openapi.yaml
+- Dockerfile
+- docker-compose.yml
+- Makefile
+- design-note.md
+- Unit Tests
+- Swagger Documentation
 
 ---
 
-## Author
+# Screenshots
+
+The `Documentation/Screenshots` folder contains screenshots demonstrating
+
+- Swagger UI
+- GitHub Issue Creation
+- GitHub Webhook Delivery
+- GitHub Webhook Events
+- Terminal Output
+- API Testing
+
+These screenshots are also included in the submitted report.
+
+---
+
+# Author
 
 Pranith Varma
 
 Course: CMPE 272 – Enterprise Software Platforms
 
-San Jose State University
+San José State University.
