@@ -1,13 +1,6 @@
-"""
-CMPE 272
-GitHub Issues Service
-
-Author: Pranith Varma
-"""
 
 from fastapi import FastAPI
 
-from app.config import settings
 from app.logger import logger
 from app.routes.health import router as health_router
 from app.routes.issues import router as issues_router
@@ -31,15 +24,15 @@ for managing issues and comments within a single GitHub repository.
 - Add Comments to Issues
 - Verify GitHub Webhook Signatures (HMAC SHA-256)
 - Process Issue and Issue Comment Events
+- Store Webhook Events for Debugging
 - OpenAPI 3.1 Documentation
 - Docker Support
 - Automated Unit Tests
 
-Developed for **CMPE 272 - Homework #2**.
-    """,
-    
-    
+Developed as part of **CMPE 272 - Homework #2**.
+""",
 )
+
 
 # ---------------------------------------------------------
 # Register API Routes
@@ -48,6 +41,25 @@ Developed for **CMPE 272 - Homework #2**.
 app.include_router(health_router)
 app.include_router(issues_router)
 app.include_router(webhook_router)
+
+
+# ---------------------------------------------------------
+# Root Endpoint
+# ---------------------------------------------------------
+
+@app.get(
+    "/",
+    tags=["Health"],
+    summary="Root Endpoint",
+    description="Returns basic information about the GitHub Issues Service API.",
+)
+def root():
+    return {
+        "message": "GitHub Issues Service API",
+        "version": "1.0.0",
+        "documentation": "/docs",
+        "health_check": "/healthz",
+    }
 
 
 # ---------------------------------------------------------
@@ -74,4 +86,4 @@ def health():
 
 @app.on_event("startup")
 async def startup():
-    logger.info("GitHub Issues Service Started")
+    logger.info("GitHub Issues Service API started successfully.")

@@ -1,14 +1,9 @@
-"""
-CMPE 272
-Webhook Routes
-
-Author: Pranith Varma
-"""
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response
 
+from app.logger import logger
+from app.storage import get_events, save_event
 from app.webhook import verify_signature
-from app.storage import save_event, get_events
 
 router = APIRouter(
     prefix="/webhook",
@@ -25,17 +20,15 @@ async def github_webhook(
 ):
     body = await request.body()
 
+    # Verify GitHub webhook signature
     if not verify_signature(body, x_hub_signature_256):
         raise HTTPException(
             status_code=401,
             detail="Invalid webhook signature",
         )
 
-    if x_github_event not in [
-        "ping",
-        "issues",
-        "issue_comment",
-    ]:
+    # Allow only supported GitHub events
+    if x_github_event not in ["ping", "issues", "issue_comment"]:
         raise HTTPException(
             status_code=400,
             detail="Unsupported webhook event",
@@ -44,12 +37,9 @@ async def github_webhook(
     payload = await request.json()
 
     action = payload.get("action")
+    issue_number = payload.get("issue", {}).get("number")
 
-    issue_number = None
-
-    if "issue" in payload:
-        issue_number = payload["issue"]["number"]
-
+    # Store webhook event
     save_event(
         x_github_delivery,
         x_github_event,
@@ -57,19 +47,21 @@ async def github_webhook(
         issue_number,
     )
 
-    print("\n========== WEBHOOK RECEIVED ==========")
-    print("Delivery:", x_github_delivery)
-    print("Event:", x_github_event)
-    print("Action:", action)
-
-    if "issue" in payload:
-        print("Issue:", payload["issue"]["title"])
-
-    print("======================================\n")
+    # Log webhook summary
+    logger.info(
+        "Webhook received | Delivery=%s | Event=%s | Action=%s | Issue=%s",
+        x_github_delivery,
+        x_github_event,
+        action,
+        issue_number,
+    )
 
     return Response(status_code=204)
 
 
 @router.get("/events")
 def events():
+    """
+    Return recently processed webhook events.
+    """
     return get_events()
