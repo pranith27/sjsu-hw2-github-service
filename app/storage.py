@@ -1,25 +1,21 @@
-"""
-CMPE 272
-Webhook Event Storage
 
-Author: Pranith Varma
-"""
-
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 events = []
 processed_deliveries = set()
 
 
 def save_event(
-    delivery_id,
-    event,
-    action,
-    issue_number,
+    delivery_id: str,
+    event: str,
+    action: str,
+    issue_number: int | None,
 ):
     """
-    Save webhook event.
-    Duplicate deliveries are ignored.
+    Store webhook events.
+
+    Duplicate GitHub deliveries are ignored using
+    the delivery identifier.
     """
 
     if delivery_id in processed_deliveries:
@@ -38,5 +34,9 @@ def save_event(
     )
 
 
-def get_events():
-    return events
+def get_events(limit: int = 20):
+    """
+    Return the latest processed webhook events.
+    """
+
+    return events[-limit:]
